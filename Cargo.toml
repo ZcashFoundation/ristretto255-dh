@@ -1,0 +1,10 @@
+[package]
+name = "ristretto255-dh"
+version = "0.1.0"
+authors = ["Deirdre Connolly <deirdre@zfnd.org>"]
+edition = "2018"
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[dependencies]
+curve25519-dalek = "2.0.0"
