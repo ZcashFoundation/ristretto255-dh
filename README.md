@@ -1,7 +1,7 @@
 # ristretto255-dh
 Diffie-Hellman key exchange using the [Ristretto255][ristretto] group, in pure Rust.
 
-This crate provides a high-level API for static and ephemeral Diffie-Hellman in the Ristretto255 prime order group as specified in an [IETF draft][ietf-draft], implemented internally over Curve25519 using [curve25519-dalek]. 
+This crate provides a high-level API for static and ephemeral Diffie-Hellman in the Ristretto255 prime order group, as specified the [IETF draft][ietf-draft], implemented internally over Curve25519 using [curve25519-dalek]. 
 
 
 ## Example
