@@ -14,13 +14,13 @@ use ristretto255_dh::PublicKey;
 
 // Alice's side
 let mut alice_csprng = OsRng::new().unwrap();
-let     alice_secret = EphemeralSecret::new(&mut alice_csprng);
-let     alice_public = PublicKey::from(&alice_secret);
+let alice_secret = EphemeralSecret::new(&mut alice_csprng);
+let alice_public = PublicKey::from(&alice_secret);
 
 // Bob's side
 let mut bob_csprng = OsRng::new().unwrap();
-let     bob_secret = EphemeralSecret::new(&mut bob_csprng);
-let     bob_public = PublicKey::from(&bob_secret);
+let bob_secret = EphemeralSecret::new(&mut bob_csprng);
+let bob_public = PublicKey::from(&bob_secret);
 
 // Alice again
 let alice_shared_secret = alice_secret.diffie_hellman(&bob_public);
