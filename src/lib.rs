@@ -9,19 +9,17 @@
 //! ## Example
 //!
 //! ```
-//! use rand_os::OsRng;
+//! use rand::rngs::OsRng;
 //!
 //! use ristretto255_dh::EphemeralSecret;
 //! use ristretto255_dh::PublicKey;
 //!
 //! // Alice's side
-//! let mut alice_csprng = OsRng::new().unwrap();
-//! let alice_secret = EphemeralSecret::new(&mut alice_csprng);
+//! let alice_secret = EphemeralSecret::new(&mut OsRng);
 //! let alice_public = PublicKey::from(&alice_secret);
 //!
 //! // Bob's side
-//! let mut bob_csprng = OsRng::new().unwrap();
-//! let bob_secret = EphemeralSecret::new(&mut bob_csprng);
+//! let bob_secret = EphemeralSecret::new(&mut OsRng);
 //! let bob_public = PublicKey::from(&bob_secret);
 //!
 //! // Alice again
@@ -31,7 +29,10 @@
 //! let bob_shared_secret = bob_secret.diffie_hellman(&alice_public);
 //!
 //! // Each peer's computed shared secret should be the same.
-//! assert_eq!(alice_shared_secret.as_bytes(), bob_shared_secret.as_bytes());
+//! assert_eq!(
+//!         <[u8; 32]>::from(alice_shared_secret),
+//!         <[u8; 32]>::from(bob_shared_secret)
+//! );
 //! ```
 //!
 //! # Installation
@@ -58,11 +59,22 @@ use rand_core::{CryptoRng, RngCore};
 use serde::{Deserialize, Serialize};
 
 #[cfg(test)]
-use proptest::prelude::*;
+use proptest::{arbitrary::Arbitrary, array, prelude::*};
 
 /// A Diffie-Hellman secret key used to derive a shared secret when
 /// combined with a public key, that only exists for a short time.
+#[derive(Debug)]
 pub struct EphemeralSecret(pub(crate) Scalar);
+
+#[cfg(test)]
+impl From<[u8; 32]> for EphemeralSecret {
+    fn from(bytes: [u8; 32]) -> Self {
+        match Scalar::from_canonical_bytes(bytes) {
+            Some(scalar) => Self(scalar),
+            None => Self(Scalar::from_bytes_mod_order(bytes)),
+        }
+    }
+}
 
 impl EphemeralSecret {
     /// Generate a `EphemeralSecret` using a new scalar mod the group
@@ -81,12 +93,28 @@ impl EphemeralSecret {
     }
 }
 
+#[cfg(test)]
+impl Arbitrary for EphemeralSecret {
+    type Parameters = ();
+
+    fn arbitrary_with(_args: Self::Parameters) -> Self::Strategy {
+        array::uniform32(any::<u8>())
+            .prop_filter("Valid scalar mod l", |b| {
+                Scalar::from_bytes_mod_order(*b).is_canonical()
+            })
+            .prop_map(|bytes| return Self::from(bytes))
+            .boxed()
+    }
+
+    type Strategy = BoxedStrategy<Self>;
+}
+
 /// The public key derived from an ephemeral or static secret key.
 #[derive(Clone, Copy, Eq, Debug, Deserialize, PartialEq, Serialize)]
 pub struct PublicKey(pub(crate) ristretto::RistrettoPoint);
 
-impl From<EphemeralSecret> for PublicKey {
-    fn from(secret: EphemeralSecret) -> Self {
+impl<'a> From<&'a EphemeralSecret> for PublicKey {
+    fn from(secret: &'a EphemeralSecret) -> Self {
         Self(&secret.0 * &constants::RISTRETTO_BASEPOINT_TABLE)
     }
 }
@@ -101,8 +129,8 @@ impl From<PublicKey> for [u8; 32] {
     }
 }
 
-impl From<StaticSecret> for PublicKey {
-    fn from(secret: StaticSecret) -> Self {
+impl<'a> From<&'a StaticSecret> for PublicKey {
+    fn from(secret: &'a StaticSecret) -> Self {
         Self(&secret.0 * &constants::RISTRETTO_BASEPOINT_TABLE)
     }
 }
@@ -124,9 +152,19 @@ impl From<[u8; 32]> for PublicKey {
 /// or `StaticSecret` and the other party's `PublicKey`.
 pub struct SharedSecret(pub(crate) ristretto::RistrettoPoint);
 
+impl From<SharedSecret> for [u8; 32] {
+    /// Copy the bytes of the internal `RistrettoPoint` as the
+    /// canonical compressed wire format. Two `RistrettoPoint`s (and
+    /// thus two `PublicKey`s) are equal iff their encodings are
+    /// equal.
+    fn from(shared_secret: SharedSecret) -> Self {
+        shared_secret.0.compress().to_bytes()
+    }
+}
+
 /// A Diffie-Hellman secret key used to derive a shared secret when
 /// combined with a public key, that can be stored and loaded.
-#[derive(Clone, Debug, Deserialize, Serialize)]
+#[derive(Clone, Debug, Eq, PartialEq, Deserialize, Serialize)]
 pub struct StaticSecret(pub(crate) Scalar);
 
 impl From<[u8; 32]> for StaticSecret {
@@ -151,8 +189,24 @@ impl StaticSecret {
     /// Do Diffie-Hellman key agreement between self's secret
     /// and a peer's public key, resulting in a `SharedSecret`.
     pub fn diffie_hellman(&self, peer_public: &PublicKey) -> SharedSecret {
-        SharedSecret(&self.0 * peer_public.0)
+        SharedSecret(self.0 * peer_public.0)
     }
+}
+
+#[cfg(test)]
+impl Arbitrary for StaticSecret {
+    type Parameters = ();
+
+    fn arbitrary_with(_args: Self::Parameters) -> Self::Strategy {
+        array::uniform32(any::<u8>())
+            .prop_filter("Valid scalar mod l", |b| {
+                Scalar::from_bytes_mod_order(*b).is_canonical()
+            })
+            .prop_map(|bytes| return Self::from(bytes))
+            .boxed()
+    }
+
+    type Strategy = BoxedStrategy<Self>;
 }
 
 #[cfg(test)]
@@ -160,10 +214,55 @@ mod tests {
 
     use super::*;
 
-    #[test]
-    fn it_works() {
-        assert_eq!(2 + 2, 4);
-    }
+    proptest! {
 
-    proptest! {}
+        #[test]
+        fn ephemeral_dh(
+            alice_secret in any::<EphemeralSecret>(),
+            bob_secret in any::<EphemeralSecret>()
+        ) {
+            // Alice's side
+            let alice_public = PublicKey::from(&alice_secret);
+
+            // Bob's side
+            let bob_public = PublicKey::from(&bob_secret);
+
+            // Alice again
+            let alice_shared_secret = alice_secret.diffie_hellman(&bob_public);
+
+            // Bob again
+            let bob_shared_secret = bob_secret.diffie_hellman(&alice_public);
+
+            // Each peer's computed shared secret should be the same.
+            prop_assert_eq!(
+                <[u8; 32]>::from(alice_shared_secret),
+                <[u8; 32]>::from(bob_shared_secret)
+            );
+        }
+
+        #[test]
+        fn static_dh(
+            alice_secret in any::<StaticSecret>(),
+            bob_secret in any::<StaticSecret>()
+        ) {
+            // Alice's side
+            let alice_public = PublicKey::from(&alice_secret);
+
+            // Bob's side
+            let bob_public = PublicKey::from(&bob_secret);
+
+            // Alice again
+            let alice_shared_secret = alice_secret.diffie_hellman(&bob_public);
+
+            // Bob again
+            let bob_shared_secret = bob_secret.diffie_hellman(&alice_public);
+
+            // Each peer's computed shared secret should be the same.
+            prop_assert_eq!(
+                <[u8; 32]>::from(alice_shared_secret),
+                <[u8; 32]>::from(bob_shared_secret)
+            );
+        }
+
+    }
 }
