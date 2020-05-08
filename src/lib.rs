@@ -315,5 +315,17 @@ mod tests {
             );
         }
 
+        #[test]
+        fn scalar_mul_different_paths(
+            secret in any::<EphemeralSecret>(),
+        ) {
+            let other_public = PublicKey(constants::RISTRETTO_BASEPOINT_POINT * secret.0);
+
+            prop_assert_eq!(
+                other_public,
+                PublicKey::from(&secret)
+            );
+        }
+
     }
 }
