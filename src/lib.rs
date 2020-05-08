@@ -45,7 +45,11 @@
 //! [x25519-dalek]: https://github.com/dalek-cryptography/x25519-dalek
 #![doc(html_root_url = "https://docs.rs/ristretto255-dh/0.1.0")]
 
-use curve25519_dalek::{constants, ristretto, scalar::Scalar};
+use curve25519_dalek::{
+    constants,
+    ristretto::{CompressedRistretto, RistrettoPoint},
+    scalar::Scalar,
+};
 use rand_core::{CryptoRng, RngCore};
 use serde::{Deserialize, Serialize};
 
@@ -54,7 +58,6 @@ use proptest::{arbitrary::Arbitrary, array, prelude::*};
 
 /// A Diffie-Hellman secret key used to derive a shared secret when
 /// combined with a public key, that only exists for a short time.
-#[derive(Debug)]
 pub struct EphemeralSecret(pub(crate) Scalar);
 
 #[cfg(test)]
@@ -101,8 +104,8 @@ impl Arbitrary for EphemeralSecret {
 }
 
 /// The public key derived from an ephemeral or static secret key.
-#[derive(Clone, Copy, Eq, Debug, Deserialize, PartialEq, Serialize)]
-pub struct PublicKey(pub(crate) ristretto::RistrettoPoint);
+#[derive(Clone, Copy, Eq, Deserialize, PartialEq, Serialize)]
+pub struct PublicKey(pub(crate) RistrettoPoint);
 
 impl<'a> From<&'a EphemeralSecret> for PublicKey {
     fn from(secret: &'a EphemeralSecret) -> Self {
@@ -132,16 +135,36 @@ impl From<[u8; 32]> for PublicKey {
     /// of a `RistrettoPoint`.
     fn from(bytes: [u8; 32]) -> Self {
         Self(
-            ristretto::CompressedRistretto::from_slice(&bytes)
+            CompressedRistretto::from_slice(&bytes)
                 .decompress()
                 .unwrap(),
         )
     }
 }
 
+#[cfg(test)]
+impl Arbitrary for PublicKey {
+    type Parameters = ();
+
+    fn arbitrary_with(_args: Self::Parameters) -> Self::Strategy {
+        array::uniform32(any::<u8>())
+            .prop_filter(
+                "Valid ristretto point",
+                |b| match CompressedRistretto::from_slice(b).decompress() {
+                    Some(_) => true,
+                    None => false,
+                },
+            )
+            .prop_map(|bytes| return Self::from(bytes))
+            .boxed()
+    }
+
+    type Strategy = BoxedStrategy<Self>;
+}
+
 /// A Diffie-Hellman shared secret derived from an `EphemeralSecret`
 /// or `StaticSecret` and the other party's `PublicKey`.
-pub struct SharedSecret(pub(crate) ristretto::RistrettoPoint);
+pub struct SharedSecret(pub(crate) RistrettoPoint);
 
 impl From<SharedSecret> for [u8; 32] {
     /// Copy the bytes of the internal `RistrettoPoint` as the
@@ -155,7 +178,7 @@ impl From<SharedSecret> for [u8; 32] {
 
 /// A Diffie-Hellman secret key used to derive a shared secret when
 /// combined with a public key, that can be stored and loaded.
-#[derive(Clone, Debug, Eq, PartialEq, Deserialize, Serialize)]
+#[derive(Clone, Eq, PartialEq, Deserialize, Serialize)]
 pub struct StaticSecret(pub(crate) Scalar);
 
 impl From<[u8; 32]> for StaticSecret {
@@ -213,7 +236,7 @@ mod tests {
         let alice_secret = EphemeralSecret::new(&mut OsRng);
         let alice_public = PublicKey::from(&alice_secret);
 
-        let bob_secret = EphemeralSecret::new(&mut OsRng);
+        let bob_secret = StaticSecret::new(&mut OsRng);
         let bob_public = PublicKey::from(&bob_secret);
 
         let alice_shared_secret = alice_secret.diffie_hellman(&bob_public);
@@ -274,7 +297,6 @@ mod tests {
 
         #[test]
         fn serde_static_key(alice_secret in any::<StaticSecret>()) {
-
             let serialized = bincode::serialize(&alice_secret).unwrap();
 
             prop_assert_eq!(
@@ -282,7 +304,14 @@ mod tests {
             );
         }
 
+        #[test]
+        fn from_into_pubkey_bytes(pubkey in any::<PublicKey>()) {
+            let bytes: [u8; 32] = pubkey.into();
 
+            prop_assert_eq!(
+                pubkey, PublicKey::from(bytes)
+            );
+        }
 
     }
 }
