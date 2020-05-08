@@ -63,7 +63,7 @@ pub struct EphemeralSecret(pub(crate) Scalar);
 
 #[cfg(test)]
 impl From<[u8; 32]> for EphemeralSecret {
-    fn from(bytes: [u8; 32]) -> Self {
+    fn from(bytes: [u8; 32]) -> EphemeralSecret {
         match Scalar::from_canonical_bytes(bytes) {
             Some(scalar) => Self(scalar),
             None => Self(Scalar::from_bytes_mod_order(bytes)),
@@ -74,7 +74,7 @@ impl From<[u8; 32]> for EphemeralSecret {
 impl EphemeralSecret {
     /// Generate a `EphemeralSecret` using a new scalar mod the group
     /// order.
-    pub fn new<T>(mut rng: T) -> Self
+    pub fn new<T>(mut rng: T) -> EphemeralSecret
     where
         T: RngCore + CryptoRng,
     {
@@ -109,7 +109,7 @@ impl Arbitrary for EphemeralSecret {
 pub struct PublicKey(pub(crate) RistrettoPoint);
 
 impl<'a> From<&'a EphemeralSecret> for PublicKey {
-    fn from(secret: &'a EphemeralSecret) -> Self {
+    fn from(secret: &'a EphemeralSecret) -> PublicKey {
         Self(&secret.0 * &constants::RISTRETTO_BASEPOINT_TABLE)
     }
 }
@@ -119,13 +119,13 @@ impl From<PublicKey> for [u8; 32] {
     /// canonical compressed wire format. Two `RistrettoPoint`s (and
     /// thus two `PublicKey`s) are equal iff their encodings are
     /// equal.
-    fn from(public_key: PublicKey) -> Self {
+    fn from(public_key: PublicKey) -> [u8; 32] {
         public_key.0.compress().to_bytes()
     }
 }
 
 impl<'a> From<&'a StaticSecret> for PublicKey {
-    fn from(secret: &'a StaticSecret) -> Self {
+    fn from(secret: &'a StaticSecret) -> PublicKey {
         Self(&secret.0 * &constants::RISTRETTO_BASEPOINT_TABLE)
     }
 }
@@ -134,7 +134,7 @@ impl From<[u8; 32]> for PublicKey {
     /// Attempts to decompress an internal `RistrettoPoint` from the
     /// input bytes, which should be the canonical compressed encoding
     /// of a `RistrettoPoint`.
-    fn from(bytes: [u8; 32]) -> Self {
+    fn from(bytes: [u8; 32]) -> PublicKey {
         Self(
             CompressedRistretto::from_slice(&bytes)
                 .decompress()
@@ -172,7 +172,7 @@ impl From<SharedSecret> for [u8; 32] {
     /// canonical compressed wire format. Two `RistrettoPoint`s (and
     /// thus two `PublicKey`s) are equal iff their encodings are
     /// equal.
-    fn from(shared_secret: SharedSecret) -> Self {
+    fn from(shared_secret: SharedSecret) -> [u8; 32] {
         shared_secret.0.compress().to_bytes()
     }
 }
@@ -184,7 +184,7 @@ impl From<SharedSecret> for [u8; 32] {
 pub struct StaticSecret(pub(crate) Scalar);
 
 impl From<[u8; 32]> for StaticSecret {
-    fn from(bytes: [u8; 32]) -> Self {
+    fn from(bytes: [u8; 32]) -> StaticSecret {
         match Scalar::from_canonical_bytes(bytes) {
             Some(scalar) => Self(scalar),
             None => Self(Scalar::from_bytes_mod_order(bytes)),
@@ -195,7 +195,7 @@ impl From<[u8; 32]> for StaticSecret {
 impl StaticSecret {
     /// Generate a `StaticSecret` using a new scalar mod the group
     /// order.
-    pub fn new<T>(mut rng: T) -> Self
+    pub fn new<T>(mut rng: T) -> StaticSecret
     where
         T: RngCore + CryptoRng,
     {
