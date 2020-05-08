@@ -1,8 +1,19 @@
 [package]
 name = "ristretto255-dh"
 version = "0.1.0"
-authors = ["Deirdre Connolly <deirdre@zfnd.org>"]
+authors = ["Deirdre Connolly <durumcrustulum@gmail.com>"]
 edition = "2018"
+# When releasing to crates.io:
+# - Update html_root_url
+# - Update CHANGELOG.md
+# - Create git tag.
+readme = "README.md"
+license = "MIT OR Apache-2.0"
+repository = "https://github.com/ZcashFoundation/ristretto255-dh"
+categories = ["cryptography"]
+documentation = "https://docs.rs/ristretto255-dh"
+keywords = ["cryptography", "crypto", "ristretto", "diffie-hellman", "key-exchange"]
+description = "Diffie-Hellman key exchange using the Ristretto255 group."
 
 [dependencies]
 curve25519-dalek = { version = "2.0.0", features = ["serde"] }
