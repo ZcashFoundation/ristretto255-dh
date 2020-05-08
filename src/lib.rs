@@ -9,7 +9,7 @@
 //! ## Example
 //!
 //! ```
-//! use rand::rngs::OsRng;
+//! use rand_core::OsRng;
 //!
 //! use ristretto255_dh::EphemeralSecret;
 //! use ristretto255_dh::PublicKey;
@@ -33,15 +33,6 @@
 //!         <[u8; 32]>::from(alice_shared_secret),
 //!         <[u8; 32]>::from(bob_shared_secret)
 //! );
-//! ```
-//!
-//! # Installation
-//!
-//! To install, add the following to your project's `Cargo.toml`:
-//!
-//! ```toml
-//! [dependencies.ristretto255-dh]
-//! version = "0.1.0"
 //! ```
 //!
 //! ## About
@@ -212,7 +203,27 @@ impl Arbitrary for StaticSecret {
 #[cfg(test)]
 mod tests {
 
+    use bincode;
+    use rand_core::OsRng;
+
     use super::*;
+
+    #[test]
+    fn random_dh() {
+        let alice_secret = EphemeralSecret::new(&mut OsRng);
+        let alice_public = PublicKey::from(&alice_secret);
+
+        let bob_secret = EphemeralSecret::new(&mut OsRng);
+        let bob_public = PublicKey::from(&bob_secret);
+
+        let alice_shared_secret = alice_secret.diffie_hellman(&bob_public);
+        let bob_shared_secret = bob_secret.diffie_hellman(&alice_public);
+
+        assert_eq!(
+            <[u8; 32]>::from(alice_shared_secret),
+            <[u8; 32]>::from(bob_shared_secret)
+        );
+    }
 
     proptest! {
 
@@ -221,19 +232,12 @@ mod tests {
             alice_secret in any::<EphemeralSecret>(),
             bob_secret in any::<EphemeralSecret>()
         ) {
-            // Alice's side
             let alice_public = PublicKey::from(&alice_secret);
-
-            // Bob's side
             let bob_public = PublicKey::from(&bob_secret);
 
-            // Alice again
             let alice_shared_secret = alice_secret.diffie_hellman(&bob_public);
-
-            // Bob again
             let bob_shared_secret = bob_secret.diffie_hellman(&alice_public);
 
-            // Each peer's computed shared secret should be the same.
             prop_assert_eq!(
                 <[u8; 32]>::from(alice_shared_secret),
                 <[u8; 32]>::from(bob_shared_secret)
@@ -245,24 +249,40 @@ mod tests {
             alice_secret in any::<StaticSecret>(),
             bob_secret in any::<StaticSecret>()
         ) {
-            // Alice's side
             let alice_public = PublicKey::from(&alice_secret);
-
-            // Bob's side
             let bob_public = PublicKey::from(&bob_secret);
 
-            // Alice again
             let alice_shared_secret = alice_secret.diffie_hellman(&bob_public);
-
-            // Bob again
             let bob_shared_secret = bob_secret.diffie_hellman(&alice_public);
 
-            // Each peer's computed shared secret should be the same.
             prop_assert_eq!(
                 <[u8; 32]>::from(alice_shared_secret),
                 <[u8; 32]>::from(bob_shared_secret)
             );
         }
+
+        #[test]
+        fn serde_pubkey(alice_secret in any::<EphemeralSecret>()) {
+            let alice_public = PublicKey::from(&alice_secret);
+
+            let serialized = bincode::serialize(&alice_public).unwrap();
+
+            prop_assert_eq!(
+                alice_public, bincode::deserialize(&serialized[..]).unwrap()
+            );
+        }
+
+        #[test]
+        fn serde_static_key(alice_secret in any::<StaticSecret>()) {
+
+            let serialized = bincode::serialize(&alice_secret).unwrap();
+
+            prop_assert_eq!(
+                alice_secret, bincode::deserialize(&serialized[..]).unwrap()
+            );
+        }
+
+
 
     }
 }
