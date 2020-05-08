@@ -58,6 +58,7 @@ use proptest::{arbitrary::Arbitrary, array, prelude::*};
 
 /// A Diffie-Hellman secret key used to derive a shared secret when
 /// combined with a public key, that only exists for a short time.
+#[cfg_attr(test, derive(Debug))]
 pub struct EphemeralSecret(pub(crate) Scalar);
 
 #[cfg(test)]
@@ -104,7 +105,7 @@ impl Arbitrary for EphemeralSecret {
 }
 
 /// The public key derived from an ephemeral or static secret key.
-#[derive(Clone, Copy, Eq, Deserialize, PartialEq, Serialize)]
+#[derive(Clone, Copy, Debug, Eq, Deserialize, PartialEq, Serialize)]
 pub struct PublicKey(pub(crate) RistrettoPoint);
 
 impl<'a> From<&'a EphemeralSecret> for PublicKey {
@@ -179,6 +180,7 @@ impl From<SharedSecret> for [u8; 32] {
 /// A Diffie-Hellman secret key used to derive a shared secret when
 /// combined with a public key, that can be stored and loaded.
 #[derive(Clone, Eq, PartialEq, Deserialize, Serialize)]
+#[cfg_attr(test, derive(Debug))]
 pub struct StaticSecret(pub(crate) Scalar);
 
 impl From<[u8; 32]> for StaticSecret {
