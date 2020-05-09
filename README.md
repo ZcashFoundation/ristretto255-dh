@@ -1,13 +1,17 @@
-# ristretto255-dh
-Diffie-Hellman key exchange using the [Ristretto255][ristretto] group, in pure Rust.
+# ristretto255-dh [![](https://img.shields.io/crates/v/ristretto255-dh.svg)](https://crates.io/crates/ristretto255-dh) [![](https://docs.rs/ristretto255-dh/badge.svg)](https://docs.rs/ristretto255-dh) [![](https://github.com/ZcashFoundation/ristretto255-dh/workflows/CI/badge.svg?branch=main)](https://github.com/ZcashFoundation/ristretto255-dh/actions?query=workflow%3ACI+branch%3Amain)
 
-This crate provides a high-level API for static and ephemeral Diffie-Hellman in the Ristretto255 prime order group, as specified the [IETF draft][ietf-draft], implemented internally over Curve25519 using [curve25519-dalek].
+Diffie-Hellman key exchange using the [Ristretto255][ristretto] group,
+in pure Rust.
 
+This crate provides a high-level API for static and ephemeral
+Diffie-Hellman in the Ristretto255 prime order group, as specified the
+[IETF draft][ietf-draft], implemented internally over Curve25519 using
+[curve25519-dalek].
 
 ## Example
 
 ```
-use rand::rngs::OsRng;
+use rand_core::OsRng;
 
 use ristretto255_dh::EphemeralSecret;
 use ristretto255_dh::PublicKey;
@@ -28,15 +32,6 @@ let bob_shared_secret = bob_secret.diffie_hellman(&alice_public);
 
 // Each peer's computed shared secret should be the same.
 assert_eq!(<[u8; 32]>::from(alice_shared_secret), <[u8; 32]>::from(bob_shared_secret));
-```
-
-# Installation
-
-To install, add the following to your project's `Cargo.toml`:
-
-```toml
-[dependencies.ristretto255-dh]
-version = "0.1.0"
 ```
 
 ## About
