@@ -10,7 +10,7 @@ Diffie-Hellman in the Ristretto255 prime order group, as specified the
 
 ## Example
 
-```
+```rust
 use rand_core::OsRng;
 
 use ristretto255_dh::EphemeralSecret;
