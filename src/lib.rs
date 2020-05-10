@@ -1,6 +1,8 @@
 #![cfg_attr(feature = "nightly", feature(external_doc))]
 #![cfg_attr(feature = "nightly", doc(include = "../README.md"))]
 
+use std::convert::TryFrom;
+
 use curve25519_dalek::{
     constants,
     ristretto::{CompressedRistretto, RistrettoPoint},
@@ -49,12 +51,7 @@ impl Arbitrary for EphemeralSecret {
     type Parameters = ();
 
     fn arbitrary_with(_args: Self::Parameters) -> Self::Strategy {
-        array::uniform32(any::<u8>())
-            .prop_filter("Valid scalar mod l", |b| {
-                Scalar::from_bytes_mod_order(*b).is_canonical()
-            })
-            .prop_map(|bytes| return Self::from(bytes))
-            .boxed()
+        array::uniform32(any::<u8>()).prop_map_into().boxed()
     }
 
     type Strategy = BoxedStrategy<Self>;
@@ -86,16 +83,17 @@ impl<'a> From<&'a StaticSecret> for PublicKey {
     }
 }
 
-impl From<[u8; 32]> for PublicKey {
+impl TryFrom<[u8; 32]> for PublicKey {
+    type Error = &'static str;
+
     /// Attempts to decompress an internal `RistrettoPoint` from the
     /// input bytes, which should be the canonical compressed encoding
     /// of a `RistrettoPoint`.
-    fn from(bytes: [u8; 32]) -> PublicKey {
-        Self(
-            CompressedRistretto::from_slice(&bytes)
-                .decompress()
-                .unwrap(),
-        )
+    fn try_from(bytes: [u8; 32]) -> Result<PublicKey, Self::Error> {
+        match CompressedRistretto::from_slice(&bytes).decompress() {
+            Some(ristretto_point) => Ok(Self(ristretto_point)),
+            None => Err("Ristretto point decompression failed"),
+        }
     }
 }
 
@@ -105,14 +103,13 @@ impl Arbitrary for PublicKey {
 
     fn arbitrary_with(_args: Self::Parameters) -> Self::Strategy {
         array::uniform32(any::<u8>())
-            .prop_filter(
-                "Valid ristretto point",
-                |b| match CompressedRistretto::from_slice(b).decompress() {
-                    Some(_) => true,
-                    None => false,
+            .prop_filter_map(
+                "Decompressible Ristretto point",
+                |b| match PublicKey::try_from(b) {
+                    Ok(public_key) => Some(public_key),
+                    Err(_) => None,
                 },
             )
-            .prop_map(|bytes| return Self::from(bytes))
             .boxed()
     }
 
@@ -267,7 +264,7 @@ mod tests {
             let bytes: [u8; 32] = pubkey.into();
 
             prop_assert_eq!(
-                pubkey, PublicKey::from(bytes)
+                Ok(pubkey), PublicKey::try_from(bytes)
             );
         }
 
