@@ -1,6 +1,6 @@
 [package]
 name = "ristretto255-dh"
-version = "0.2.0"
+version = "0.3.0"
 authors = ["Deirdre Connolly <durumcrustulum@gmail.com>"]
 edition = "2018"
 readme = "README.md"
