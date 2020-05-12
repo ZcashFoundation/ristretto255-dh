@@ -128,9 +128,15 @@ impl From<SharedSecret> for [u8; 32] {
 
 /// A Diffie-Hellman secret key used to derive a shared secret when
 /// combined with a public key, that can be stored and loaded.
-#[derive(Clone, Eq, PartialEq, Deserialize, Serialize)]
+#[derive(Clone, Copy, Eq, PartialEq, Deserialize, Serialize)]
 #[cfg_attr(test, derive(Debug))]
 pub struct StaticSecret(pub(crate) Scalar);
+
+impl From<StaticSecret> for [u8; 32] {
+    fn from(static_secret: StaticSecret) -> [u8; 32] {
+        static_secret.0.to_bytes()
+    }
+}
 
 impl From<[u8; 32]> for StaticSecret {
     fn from(bytes: [u8; 32]) -> StaticSecret {
@@ -261,6 +267,15 @@ mod tests {
 
             prop_assert_eq!(
                 Ok(pubkey), PublicKey::try_from(bytes)
+            );
+        }
+
+        #[test]
+        fn from_into_static_secret_bytes(static_secret in any::<StaticSecret>()) {
+            let bytes: [u8; 32] = static_secret.into();
+
+            prop_assert_eq!(
+                static_secret, StaticSecret::from(bytes)
             );
         }
 
