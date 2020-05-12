@@ -103,13 +103,9 @@ impl Arbitrary for PublicKey {
 
     fn arbitrary_with(_args: Self::Parameters) -> Self::Strategy {
         array::uniform32(any::<u8>())
-            .prop_filter_map(
-                "Decompressible Ristretto point",
-                |b| match PublicKey::try_from(b) {
-                    Ok(public_key) => Some(public_key),
-                    Err(_) => None,
-                },
-            )
+            .prop_filter_map("Decompressible Ristretto point", |b| {
+                PublicKey::try_from(b).ok()
+            })
             .boxed()
     }
 
