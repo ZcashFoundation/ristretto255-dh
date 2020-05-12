@@ -12,20 +12,25 @@ use rand_core::{CryptoRng, RngCore};
 use serde::{Deserialize, Serialize};
 
 #[cfg(test)]
-use proptest::{arbitrary::Arbitrary, array, prelude::*};
+use proptest::{arbitrary::Arbitrary, array, collection, prelude::*};
 
 /// A Diffie-Hellman secret key used to derive a shared secret when
 /// combined with a public key, that only exists for a short time.
 #[cfg_attr(test, derive(Debug))]
 pub struct EphemeralSecret(pub(crate) Scalar);
 
-#[cfg(test)]
 impl From<[u8; 32]> for EphemeralSecret {
     fn from(bytes: [u8; 32]) -> EphemeralSecret {
         match Scalar::from_canonical_bytes(bytes) {
             Some(scalar) => Self(scalar),
             None => Self(Scalar::from_bytes_mod_order(bytes)),
         }
+    }
+}
+
+impl From<[u8; 64]> for EphemeralSecret {
+    fn from(bytes: [u8; 64]) -> EphemeralSecret {
+        Self(Scalar::from_bytes_mod_order_wide(&bytes))
     }
 }
 
@@ -147,6 +152,12 @@ impl From<[u8; 32]> for StaticSecret {
     }
 }
 
+impl From<[u8; 64]> for StaticSecret {
+    fn from(bytes: [u8; 64]) -> StaticSecret {
+        Self(Scalar::from_bytes_mod_order_wide(&bytes))
+    }
+}
+
 impl StaticSecret {
     /// Generate a `StaticSecret` using a new scalar mod the group
     /// order.
@@ -206,6 +217,30 @@ mod tests {
     }
 
     proptest! {
+
+        #[test]
+        fn random_dh_wide(alice_bytes in collection::vec(any::<u8>(), 64),
+                          bob_bytes in collection::vec(any::<u8>(), 64)) {
+            let mut a = [0u8; 64];
+            a.copy_from_slice(alice_bytes.as_slice());
+
+            let alice_secret = EphemeralSecret::from(a);
+            let alice_public = PublicKey::from(&alice_secret);
+
+            let mut b = [0u8; 64];
+            b.copy_from_slice(bob_bytes.as_slice());
+
+            let bob_secret = StaticSecret::from(b);
+            let bob_public = PublicKey::from(&bob_secret);
+
+            let alice_shared_secret = alice_secret.diffie_hellman(&bob_public);
+            let bob_shared_secret = bob_secret.diffie_hellman(&alice_public);
+
+            assert_eq!(
+                <[u8; 32]>::from(alice_shared_secret),
+                <[u8; 32]>::from(bob_shared_secret)
+            );
+        }
 
         #[test]
         fn ephemeral_dh(
