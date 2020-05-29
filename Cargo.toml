@@ -27,7 +27,7 @@ zeroize = "1.1.0"
 [dev-dependencies]
 bincode = "1.2.1"
 proptest = "0.9"
-proptest-derive = "0.1.0"
+proptest-derive = "0.2.0"
 
 [features]
 nightly = []
