@@ -1,5 +1,4 @@
-#![cfg_attr(feature = "nightly", feature(external_doc))]
-#![cfg_attr(feature = "nightly", doc(include = "../README.md"))]
+#![doc = include_str!("../README.md")]
 
 use std::convert::TryFrom;
 
