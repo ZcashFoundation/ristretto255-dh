@@ -183,7 +183,7 @@ impl Arbitrary for StaticSecret {
             .prop_filter("Valid scalar mod l", |b| {
                 Scalar::from_bytes_mod_order(*b).is_canonical()
             })
-            .prop_map(|bytes| return Self::from(bytes))
+            .prop_map(Self::from)
             .boxed()
     }
 
@@ -193,7 +193,6 @@ impl Arbitrary for StaticSecret {
 #[cfg(test)]
 mod tests {
 
-    use bincode;
     use rand_core::OsRng;
 
     use super::*;
