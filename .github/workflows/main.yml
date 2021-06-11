@@ -11,7 +11,7 @@ on:
 jobs:
 
   test:
-    name: Test on ${{ matrix.os }}
+    name: Build & Test  on ${{ matrix.os }} (+nightly)
     runs-on: ${{ matrix.os }}
     strategy:
       matrix:
@@ -27,32 +27,17 @@ jobs:
         uses: actions-rs/cargo@v1
         with:
           command: fetch
-      - name: Test (+nightly)
-        uses: actions-rs/cargo@v1
-        with:
-          command: test
-          args: --verbose --all
       - name: Build (+nightly)
         uses: actions-rs/cargo@v1
         with:
           command: build
           args: --verbose --release
+      - name: Test (+nightly)
+        uses: actions-rs/cargo@v1
+        with:
+          command: test
+          args: --verbose --all-features
 
-  doctest-nightly:
-    name: Doctests (+nightly)
-    runs-on: ubuntu-latest
-    steps:
-    - uses: actions/checkout@v2.3.4
-    # Because we use nightly features for building docs,
-    # using --all-features will fail without nightly toolchain.
-    - uses: actions-rs/toolchain@v1.0.7
-      with:
-        toolchain: nightly
-        override: true
-    - uses: actions-rs/cargo@v1
-      with:
-        command: test
-        args: --all-features --all-targets
 
   clippy:
     name: Clippy (+nightly)
@@ -90,6 +75,7 @@ jobs:
       - name: Install rustfilt symbol demangler
         run: |
           cargo install rustfilt
+
       - name: Rerun tests for coverage
         env:
           RUSTFLAGS: -Zinstrument-coverage -C link-dead-code -C debuginfo=2
@@ -97,14 +83,17 @@ jobs:
           ZEBRA_SKIP_NETWORK_TESTS: 1
           CARGO_INCREMENTAL: 0
         run: |
-          cargo test
-          cargo test --no-run --message-format=json | jq -r "select(.profile.test == true) | .filenames[]" | grep -v dSYM - > filenames.txt
+          cargo test --all-features
+          cargo test --all-features --no-run --message-format=json | jq -r "select(.profile.test == true) | .filenames[]" | grep -v dSYM - > filenames.txt
+
       - name: Merge coverage data
         run: |
           $(rustc --print target-libdir)/../bin/llvm-profdata merge test.*.profraw -o test.profdata
+
       - name: Generate detailed html coverage report for github artifact
         run: |
           $(rustc --print target-libdir)/../bin/llvm-cov show -format=html -ignore-filename-regex=".*/.cargo/registry/.*" -ignore-filename-regex=".*/.cargo/git/.*" -ignore-filename-regex=".*/.rustup/.*" -Xdemangler=rustfilt -show-instantiations -output-dir=./coverage -instr-profile=./test.profdata $(printf -- "-object %s " $(cat filenames.txt))
+
       - uses: actions/upload-artifact@v2
         with:
           name: coverage
